@@ -1,0 +1,23 @@
+.p4n-rating-host {
+  position: relative !important;
+}
+
+.p4n-rating-badge {
+  position: absolute;
+  z-index: 10000;
+  right: 0;
+  top: 0;
+  transform: translate(50%, -35%);
+  min-width: 2.4em;
+  padding: 0.1em 0.32em;
+  font: 600 9px/1.2 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: #0d47a1;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(13, 71, 161, 0.35);
+  border-radius: 3px;
+  box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.2);
+  white-space: nowrap;
+  pointer-events: none;
+  text-align: center;
+  box-sizing: border-box;
+}

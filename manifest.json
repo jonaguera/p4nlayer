@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "P4N Extra Layer",
+  "version": "1.0.0",
+  "description": "Rating y comentarios sobre cada pin, filtros por nº comentarios y fecha, ficha con fotos/servicios y Street View en park4night.",
+  "minimum_chrome_version": "109",
+  "permissions": ["storage"],
+  "action": {
+    "default_title": "P4N Extra Layer",
+    "default_popup": "src/popup.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://park4night.com/*", "https://www.park4night.com/*"],
+      "js": ["src/inject-bootstrap.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    },
+    {
+      "matches": ["https://park4night.com/*", "https://www.park4night.com/*"],
+      "js": ["src/map-badges.js"],
+      "css": ["styles/badges.css"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "host_permissions": ["https://park4night.com/*", "https://www.park4night.com/*"],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "injected/around-hook.js",
+        "assets/icons/google-street-view.png",
+        "assets/icons/pegman.svg"
+      ],
+      "matches": ["https://park4night.com/*", "https://www.park4night.com/*"]
+    }
+  ]
+}

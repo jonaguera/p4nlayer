@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>P4N Extra Layer</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        margin: 0;
+        min-width: 280px;
+        font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        padding: 14px;
+      }
+      h1 {
+        font-size: 15px;
+        margin: 0 0 12px 0;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .hint {
+        margin: 10px 0 0 0;
+        font-size: 12px;
+        opacity: 0.8;
+      }
+      .state {
+        margin-top: 10px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .options {
+        margin-top: 12px;
+        border-top: 1px solid color-mix(in oklab, currentColor 20%, transparent);
+        padding-top: 10px;
+        display: grid;
+        gap: 8px;
+      }
+      .row label {
+        user-select: none;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>P4N Extra Layer</h1>
+    <div class="row">
+      <label for="enabled">Extensión activada</label>
+      <input id="enabled" type="checkbox">
+    </div>
+    <div class="options">
+      <div class="row">
+        <label for="autoSearch">Auto buscar al mover mapa</label>
+        <input id="autoSearch" type="checkbox">
+      </div>
+      <div class="row">
+        <label for="fullWidth">Usar ancho completo del viewport</label>
+        <input id="fullWidth" type="checkbox">
+      </div>
+      <div class="row">
+        <label for="hideGooglePois">No mostrar POIs de Google)</label>
+        <input id="hideGooglePois" type="checkbox">
+      </div>
+    </div>
+    <div id="state" class="state" aria-live="polite"></div>
+    <p class="hint">Al cambiar el estado se recarga la pestaña activa para aplicar el cambio.</p>
+    <script src="popup.js"></script>
+  </body>
+  </html>

@@ -27,6 +27,8 @@
     }
   }
 
+  installPlaceDetailStreetViewClickDelegateP4n();
+
   function resolveExtensionAssetUrlP4n(attrName, assetPath) {
     try {
       var attr =
@@ -785,10 +787,14 @@
       "margin:0;padding:0;line-height:0;z-index:5}" +
       ".p4n-sv-link:hover{transform:translateY(-50%) scale(1.06)}" +
       ".p4n-sv-link img{display:block;width:100%;height:100%;object-fit:contain;border-radius:inherit}" +
-      "ul.place-actions a.p4n-sv-in-actions,ul.place-actions a.p4n-sv-place-action{" +
-      "position:static;right:auto;top:auto;z-index:1;transform:none;line-height:1.2;" +
-      "flex-direction:column;align-items:center;justify-content:flex-start;gap:6px}" +
-      "ul.place-actions a.p4n-sv-in-actions:hover,ul.place-actions a.p4n-sv-place-action:hover{" +
+      "ul.place-actions a.p4n-sv-in-actions,ul.place-actions a.p4n-sv-place-action," +
+      "ul.place-actions button.p4n-sv-in-actions,ul.place-actions button.p4n-sv-place-action{" +
+      "position:relative;right:auto;top:auto;z-index:5;transform:none;line-height:1.2;" +
+      "flex-direction:column;align-items:center;justify-content:flex-start;gap:6px;" +
+      "font:inherit;color:#334155;cursor:pointer;appearance:none;-webkit-appearance:none;" +
+      "box-sizing:border-box}" +
+      "ul.place-actions a.p4n-sv-in-actions:hover,ul.place-actions a.p4n-sv-place-action:hover," +
+      "ul.place-actions button.p4n-sv-in-actions:hover,ul.place-actions button.p4n-sv-place-action:hover{" +
       "transform:scale(1.05)}" +
       "ul.place-actions .p4n-sv-place-ico{flex:0 0 auto;display:inline-flex;align-items:center;" +
       "justify-content:center;border-radius:999px;overflow:hidden}" +
@@ -1053,34 +1059,103 @@
   }
 
   function createPlaceDetailSvActionLinkP4n(href) {
-    var a = document.createElement("a");
-    a.className = "p4n-sv-link p4n-sv-in-actions p4n-sv-place-action";
-    a.href = href;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.title = "Abrir Google Street View";
-    a.setAttribute("aria-label", "Abrir Google Street View");
-    a.innerHTML =
+    /* <button>: la SPA intercepta <a href>; el listado de acciones se re-renderiza. */
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "p4n-sv-link p4n-sv-in-actions p4n-sv-place-action";
+    b.setAttribute("data-p4nlayer-sv-place-action", "1");
+    b.setAttribute("data-p4n-sv-href", href);
+    b.title = "Abrir Google Street View";
+    b.setAttribute("aria-label", "Abrir Google Street View");
+    b.innerHTML =
       '<span class="p4n-sv-place-ico"><img src="' +
       escapeHtmlP4n(P4N_SV_ICON_URL || P4N_SV_FALLBACK_URL) +
       '" alt="" aria-hidden="true" loading="lazy"></span>' +
       '<span class="p4n-sv-place-label">' +
       escapeHtmlP4n(placeDetailSvButtonLabelP4n()) +
       "</span>";
-    return a;
+    return b;
+  }
+
+  var placeDetailSvClickDelegateP4nInstalled = false;
+  function installPlaceDetailStreetViewClickDelegateP4n() {
+    if (placeDetailSvClickDelegateP4nInstalled) {
+      return;
+    }
+    placeDetailSvClickDelegateP4nInstalled = true;
+    var lastOpenAtP4n = 0;
+    var lastOpenHrefP4n = "";
+    var placeDetailSvFromEventP4n = function (ev) {
+      var t = ev.target;
+      if (!t || typeof t.closest !== "function") {
+        return;
+      }
+      var el = t.closest("[data-p4nlayer-sv-place-action='1']");
+      if (!el) {
+        return;
+      }
+      var h = String(el.getAttribute("data-p4n-sv-href") || "").trim();
+      if (!h || h.indexOf("http") !== 0) {
+        return;
+      }
+      var now = Date.now();
+      if (h === lastOpenHrefP4n && now - lastOpenAtP4n < 450) {
+        return;
+      }
+      lastOpenHrefP4n = h;
+      lastOpenAtP4n = now;
+      try {
+        ev.preventDefault();
+        ev.stopPropagation();
+      } catch (_e) {
+        /* ignore */
+      }
+      try {
+        window.open(h, "_blank", "noopener,noreferrer");
+      } catch (_o) {
+        /* ignore */
+      }
+    };
+    window.addEventListener("click", placeDetailSvFromEventP4n, true);
+    window.addEventListener(
+      "pointerdown",
+      function (ev) {
+        if (ev.button != null && ev.button !== 0) {
+          return;
+        }
+        placeDetailSvFromEventP4n(ev);
+      },
+      true
+    );
   }
 
   function ensurePlaceActionSvLinkP4n(li, href) {
-    var a = li.querySelector("a.p4n-sv-link");
-    if (!a) {
-      a = createPlaceDetailSvActionLinkP4n(href);
-      li.appendChild(a);
-      return a;
+    var oldA = li.querySelector("a.p4n-sv-link");
+    if (oldA) {
+      try {
+        li.removeChild(oldA);
+      } catch (_rm) {
+        /* ignore */
+      }
     }
-    a.href = href;
-    a.classList.add("p4n-sv-in-actions", "p4n-sv-place-action");
-    if (!a.querySelector(".p4n-sv-place-ico")) {
-      a.innerHTML =
+    var cur = li.querySelector("[data-p4nlayer-sv-place-action='1']");
+    if (cur && String(cur.tagName).toLowerCase() !== "button") {
+      try {
+        li.removeChild(cur);
+      } catch (_rm2) {
+        /* ignore */
+      }
+      cur = null;
+    }
+    if (!cur) {
+      cur = createPlaceDetailSvActionLinkP4n(href);
+      li.appendChild(cur);
+      return cur;
+    }
+    cur.setAttribute("data-p4n-sv-href", href);
+    cur.classList.add("p4n-sv-in-actions", "p4n-sv-place-action", "p4n-sv-link");
+    if (!cur.querySelector(".p4n-sv-place-ico")) {
+      cur.innerHTML =
         '<span class="p4n-sv-place-ico"><img src="' +
         escapeHtmlP4n(P4N_SV_ICON_URL || P4N_SV_FALLBACK_URL) +
         '" alt="" aria-hidden="true" loading="lazy"></span>' +
@@ -1088,7 +1163,7 @@
         escapeHtmlP4n(placeDetailSvButtonLabelP4n()) +
         "</span>";
     }
-    return a;
+    return cur;
   }
 
   function applySvLinkSizeForPlaceActionsP4n(link) {
@@ -1171,10 +1246,6 @@
         if (liRm) {
           liRm.remove();
         }
-        var orphan = document.querySelector("a.p4n-sv-link");
-        if (orphan) {
-          orphan.remove();
-        }
         unwrapP4nSvWrapP4n();
       } catch (_cl) {
         /* ignore */
@@ -1183,6 +1254,16 @@
     }
     var actionsList = findPlaceActionsListP4n();
     if (actionsList) {
+      if (actionsList.getAttribute("data-p4nlayer-sv-obs") !== "1") {
+        actionsList.setAttribute("data-p4nlayer-sv-obs", "1");
+        try {
+          new MutationObserver(function () {
+            scheduleStreetViewLinkP4n();
+          }).observe(actionsList, { childList: true, subtree: true });
+        } catch (_obs) {
+          /* ignore */
+        }
+      }
       var contactLi = findContactActionLiP4n(actionsList);
       var svLi = document.querySelector("ul.place-actions li[data-p4nlayer-sv='1']");
       if (!svLi) {
@@ -1190,17 +1271,6 @@
         svLi.setAttribute("data-p4nlayer", "1");
         svLi.setAttribute("data-p4nlayer-sv", "1");
         svLi.className = "col-3";
-      }
-      var prev = document.querySelector("a.p4n-sv-link");
-      if (prev) {
-        var hostLi = prev.closest && prev.closest("li[data-p4nlayer-sv='1']");
-        if (hostLi !== svLi) {
-          try {
-            svLi.appendChild(prev);
-          } catch (_mv) {
-            /* ignore */
-          }
-        }
       }
       var link = ensurePlaceActionSvLinkP4n(svLi, href);
       if (contactLi) {
@@ -1221,7 +1291,9 @@
       return;
     }
     unwrapP4nSvWrapP4n();
-    var existing = document.querySelector("a.p4n-sv-link");
+    var existing = document.querySelector(
+      "a.p4n-sv-link:not(.p4n-sv-card-link)"
+    );
     var ratingNode = findRatingNodeP4n();
     if (!ratingNode || !ratingNode.parentElement) {
       return;

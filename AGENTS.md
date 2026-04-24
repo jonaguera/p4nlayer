@@ -90,6 +90,11 @@ Pieza central para futuras mejoras visuales. Orden de los bloques dentro de `.p4
 3. Añadir su URL base y regla CSS (colores) en `injectP4nStylesOnce`.
 4. Insertarla dentro del `body` en `buildPreviewHtmlP4n`.
 
+### Street View: listado vs ficha de detalle
+
+- **Listado (tarjeta al lado del mapa):** la ficha a menudo es un `<a href="…/place/…">` global; el icono añadido con `p4n-sv-card-link` usa `stopPropagation` en captura para no activar el enlace padre (HTML con `<a>` anidados es inválido; en la práctica se mitiga así).
+- **Ficha de detalle (`ul.place-actions`):** botón con `data-p4n-sv-href` + `data-p4nlayer-sv-place-action` (no `<a>`). `ensurePlaceActionSvLinkP4n` localiza el nodo con `[data-p4nlayer-sv-place-action='1']` (Vue puede tocar clases). **MutationObserver** en esa `ul`. El delegado se registra **al inicio** del IIFE (además, `function` *hoisted*), con **click** y **pointerdown** en captura en `window` + debounce por URL ~450 ms frente a doble disparo. `window.open` + `stopPropagation()`.
+
 ---
 
 ## 4. Estructura del API `/api/places/around`

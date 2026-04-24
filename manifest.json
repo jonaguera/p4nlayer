@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "P4N Extra Layer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Rating y comentarios sobre cada pin, filtros por nº comentarios y fecha, ficha con fotos/servicios y Street View en park4night.",
   "minimum_chrome_version": "109",
   "permissions": ["storage"],

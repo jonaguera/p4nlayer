@@ -2,10 +2,12 @@
   "use strict";
 
   const KEY_ENABLED = "p4nlayerEnabled";
+  const KEY_SHOW_RATINGS = "p4nlayerShowRatings";
   const KEY_AUTO_SEARCH = "p4nlayerAutoSearchMap";
   const KEY_FULL_WIDTH = "p4nlayerFullWidthMap";
   const KEY_HIDE_GOOGLE_POIS = "p4nlayerHideGooglePois";
   const enabledInput = document.getElementById("enabled");
+  const showRatingsInput = document.getElementById("showRatings");
   const autoSearchInput = document.getElementById("autoSearch");
   const fullWidthInput = document.getElementById("fullWidth");
   const hideGooglePoisInput = document.getElementById("hideGooglePois");
@@ -22,15 +24,18 @@
 
   function readState(callback) {
     chrome.storage.local.get(
-      [KEY_ENABLED, KEY_AUTO_SEARCH, KEY_FULL_WIDTH, KEY_HIDE_GOOGLE_POIS],
+      [KEY_ENABLED, KEY_SHOW_RATINGS, KEY_AUTO_SEARCH, KEY_FULL_WIDTH, KEY_HIDE_GOOGLE_POIS],
       function (res) {
         const hasEnabled = res && Object.prototype.hasOwnProperty.call(res, KEY_ENABLED);
+        const hasShowRatings =
+          res && Object.prototype.hasOwnProperty.call(res, KEY_SHOW_RATINGS);
         const hasAutoSearch = res && Object.prototype.hasOwnProperty.call(res, KEY_AUTO_SEARCH);
         const hasFullWidth = res && Object.prototype.hasOwnProperty.call(res, KEY_FULL_WIDTH);
         const hasHideGooglePois =
           res && Object.prototype.hasOwnProperty.call(res, KEY_HIDE_GOOGLE_POIS);
         callback({
           enabled: hasEnabled ? res[KEY_ENABLED] !== false : true,
+          showRatings: hasShowRatings ? res[KEY_SHOW_RATINGS] !== false : true,
           autoSearch: hasAutoSearch ? res[KEY_AUTO_SEARCH] !== false : false,
           fullWidth: hasFullWidth ? res[KEY_FULL_WIDTH] !== false : false,
           hideGooglePois: hasHideGooglePois ? res[KEY_HIDE_GOOGLE_POIS] === true : false,
@@ -53,6 +58,7 @@
     chrome.storage.local.set(
       {
         [KEY_ENABLED]: Boolean(nextState.enabled),
+        [KEY_SHOW_RATINGS]: Boolean(nextState.showRatings),
         [KEY_AUTO_SEARCH]: Boolean(nextState.autoSearch),
         [KEY_FULL_WIDTH]: Boolean(nextState.fullWidth),
         [KEY_HIDE_GOOGLE_POIS]: Boolean(nextState.hideGooglePois),
@@ -61,6 +67,9 @@
         setStateText(Boolean(nextState.enabled));
         if (enabledInput) {
           enabledInput.checked = Boolean(nextState.enabled);
+        }
+        if (showRatingsInput) {
+          showRatingsInput.checked = Boolean(nextState.showRatings);
         }
         if (autoSearchInput) {
           autoSearchInput.checked = Boolean(nextState.autoSearch);
@@ -73,6 +82,9 @@
         }
         if (autoSearchInput) {
           autoSearchInput.disabled = !Boolean(nextState.enabled);
+        }
+        if (showRatingsInput) {
+          showRatingsInput.disabled = !Boolean(nextState.enabled);
         }
         if (fullWidthInput) {
           fullWidthInput.disabled = !Boolean(nextState.enabled);
@@ -91,6 +103,20 @@
       enabledInput.addEventListener("change", function () {
         writeState({
           enabled: Boolean(enabledInput.checked),
+          showRatings: showRatingsInput ? Boolean(showRatingsInput.checked) : true,
+          autoSearch: autoSearchInput ? Boolean(autoSearchInput.checked) : false,
+          fullWidth: fullWidthInput ? Boolean(fullWidthInput.checked) : false,
+          hideGooglePois: hideGooglePoisInput ? Boolean(hideGooglePoisInput.checked) : false,
+        });
+      });
+    }
+    if (showRatingsInput) {
+      showRatingsInput.checked = state.showRatings;
+      showRatingsInput.disabled = !state.enabled;
+      showRatingsInput.addEventListener("change", function () {
+        writeState({
+          enabled: enabledInput ? Boolean(enabledInput.checked) : true,
+          showRatings: Boolean(showRatingsInput.checked),
           autoSearch: autoSearchInput ? Boolean(autoSearchInput.checked) : false,
           fullWidth: fullWidthInput ? Boolean(fullWidthInput.checked) : false,
           hideGooglePois: hideGooglePoisInput ? Boolean(hideGooglePoisInput.checked) : false,
@@ -103,6 +129,7 @@
       autoSearchInput.addEventListener("change", function () {
         writeState({
           enabled: enabledInput ? Boolean(enabledInput.checked) : true,
+          showRatings: showRatingsInput ? Boolean(showRatingsInput.checked) : true,
           autoSearch: Boolean(autoSearchInput.checked),
           fullWidth: fullWidthInput ? Boolean(fullWidthInput.checked) : false,
           hideGooglePois: hideGooglePoisInput ? Boolean(hideGooglePoisInput.checked) : false,
@@ -115,6 +142,7 @@
       fullWidthInput.addEventListener("change", function () {
         writeState({
           enabled: enabledInput ? Boolean(enabledInput.checked) : true,
+          showRatings: showRatingsInput ? Boolean(showRatingsInput.checked) : true,
           autoSearch: autoSearchInput ? Boolean(autoSearchInput.checked) : false,
           fullWidth: Boolean(fullWidthInput.checked),
           hideGooglePois: hideGooglePoisInput ? Boolean(hideGooglePoisInput.checked) : false,
@@ -127,6 +155,7 @@
       hideGooglePoisInput.addEventListener("change", function () {
         writeState({
           enabled: enabledInput ? Boolean(enabledInput.checked) : true,
+          showRatings: showRatingsInput ? Boolean(showRatingsInput.checked) : true,
           autoSearch: autoSearchInput ? Boolean(autoSearchInput.checked) : false,
           fullWidth: fullWidthInput ? Boolean(fullWidthInput.checked) : false,
           hideGooglePois: Boolean(hideGooglePoisInput.checked),

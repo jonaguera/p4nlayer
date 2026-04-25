@@ -169,8 +169,8 @@ p4nlayer/
 ├── src/
 │   ├── inject-bootstrap.js # content script que inyecta el hook en la página
 │   ├── map-badges.js       # fallback con badges vía CSS en contexto aislado
-│   ├── popup.html          # popup del action (toggle de la extensión)
-│   └── popup.js            # lógica del popup
+│   ├── popup.html          # popup del action (toggle + preferencias)
+│   └── popup.js            # lógica del popup y persistencia en chrome.storage
 ├── injected/
 │   └── around-hook.js      # TODO el trabajo pesado vive aquí
 ├── styles/
@@ -191,6 +191,7 @@ p4nlayer/
 - Todos los identificadores públicos llevan sufijo `P4n` para evitar colisiones con la app (`ensureTypeIconOnMarkerP4n`, `buildPreviewHtmlP4n`, etc.).
 - Marcar DOM propio con `data-p4nlayer="1"` o `data-p4nlayerHoverBound="1"` para no re-procesar.
 - `dlog(...)` solo imprime si `localStorage.p4nlayerDebug === "1"`. Útil para depurar sin llenar la consola al usuario.
+- Preferencias del popup: `chrome.storage.local` (ej. `p4nlayerShowRatings`) y paso al hook por atributos `data-p4n-*` en `<html>` y en el `<script id="p4nlayer-page-hook-script">`.
 - Siempre envolver llamadas a APIs externas (`try { ... } catch (_) { /* ignore */ }`) — park4night a veces reemplaza `fetch` o recrea Leaflet.
 - `ensureFetchWrapped()` y el patcheo de Leaflet se reintenta periódicamente (`setInterval`) porque la SPA puede volver a pisar los globales.
 - Escapar siempre con `escapeHtmlP4n` cualquier string que se meta en `innerHTML`.

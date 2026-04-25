@@ -96,6 +96,7 @@
   const EVENT_NAME = "p4nlayer-places";
   const ATTR = "data-p4n-id";
   const FETCH_WRAPPED = "__p4nlayerFetchWrapped__";
+  const SHOW_RATINGS_ATTR_P4n = "data-p4n-show-ratings";
   const AUTO_SEARCH_ATTR_P4n = "data-p4n-auto-search-map";
   const FULL_WIDTH_ATTR_P4n = "data-p4n-full-width-map";
   const HIDE_GOOGLE_POIS_ATTR_P4n = "data-p4n-hide-google-pois";
@@ -131,6 +132,7 @@
     return String(raw) !== "0";
   }
 
+  var SHOW_RATINGS_ENABLED_P4n = readBoolAttrSettingP4n(SHOW_RATINGS_ATTR_P4n, true);
   var AUTO_SEARCH_ENABLED_P4n = readBoolAttrSettingP4n(AUTO_SEARCH_ATTR_P4n, false);
   var FULL_WIDTH_ENABLED_P4n = readBoolAttrSettingP4n(FULL_WIDTH_ATTR_P4n, false);
   /** Desactivado por defecto: el mapa en P4N sigue con lyrs=s,h (foto+POIs) tal cual. */
@@ -688,6 +690,9 @@
   }
 
   function contentForP4n(place) {
+    if (!SHOW_RATINGS_ENABLED_P4n) {
+      return null;
+    }
     var ratingText = ratingTextP4n(place);
     var reviews = reviewCountP4n(place);
     if (!ratingText && reviews === 0) {
@@ -2454,9 +2459,11 @@
       '<span><span class="p4n-preview-ico">\uD83D\uDCAC</span> ' +
       escapeHtmlP4n(reviews) +
       "</span>" +
-      '<span><span class="p4n-preview-ico">\u2605</span> ' +
-      escapeHtmlP4n(ratingText) +
-      "</span>" +
+      (SHOW_RATINGS_ENABLED_P4n
+        ? '<span><span class="p4n-preview-ico">\u2605</span> ' +
+          escapeHtmlP4n(ratingText) +
+          "</span>"
+        : "") +
       "</div>";
     var servicesRow = buildIconRowP4n("services", place.services);
     var activitiesRow = buildIconRowP4n("activities", place.activities);

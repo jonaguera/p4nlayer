@@ -13,7 +13,7 @@ No se publica un paquete `.crx` listo; para instalarlo desde el código, usa la 
 ## Qué aporta al usuario final
 
 - **Valoración y comentarios sobre cada marcador**  
-  Ves de un vistazo las estrellas y el número de comentarios en cada punto del mapa, sin abrir cada ficha.
+  Ves de un vistazo las estrellas y el número de comentarios en cada punto del mapa, sin abrir cada ficha. Si prefieres un mapa menos cargado, puedes ocultar las estrellas/valoración desde el icono de la extensión (activado por defecto).
 
 - **Filtro por número de comentarios**  
   Puedes mostrar solo lugares con un mínimo de comentarios (por ejemplo, 10, 20 o más), para priorizar sitios con más opiniones reales.

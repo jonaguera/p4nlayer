@@ -6,6 +6,7 @@
   const SV_ICON_PATH = "assets/icons/google-street-view.png";
   const PEGMAN_ICON_PATH = "assets/icons/pegman.svg";
   const KEY_ENABLED = "p4nlayerEnabled";
+  const KEY_SHOW_RATINGS = "p4nlayerShowRatings";
   const KEY_AUTO_SEARCH = "p4nlayerAutoSearchMap";
   const KEY_FULL_WIDTH = "p4nlayerFullWidthMap";
   const KEY_HIDE_GOOGLE_POIS = "p4nlayerHideGooglePois";
@@ -20,20 +21,29 @@
 
   function readSettings(run) {
     if (typeof chrome === "undefined" || !chrome.storage || !chrome.storage.local) {
-      run({ enabled: true, autoSearch: false, fullWidth: false, hideGooglePois: false });
+      run({
+        enabled: true,
+        showRatings: true,
+        autoSearch: false,
+        fullWidth: false,
+        hideGooglePois: false,
+      });
       return;
     }
     try {
       chrome.storage.local.get(
-        [KEY_ENABLED, KEY_AUTO_SEARCH, KEY_FULL_WIDTH, KEY_HIDE_GOOGLE_POIS],
+        [KEY_ENABLED, KEY_SHOW_RATINGS, KEY_AUTO_SEARCH, KEY_FULL_WIDTH, KEY_HIDE_GOOGLE_POIS],
         function (res) {
         const hasEnabled = res && Object.prototype.hasOwnProperty.call(res, KEY_ENABLED);
+        const hasShowRatings =
+          res && Object.prototype.hasOwnProperty.call(res, KEY_SHOW_RATINGS);
         const hasAutoSearch = res && Object.prototype.hasOwnProperty.call(res, KEY_AUTO_SEARCH);
         const hasFullWidth = res && Object.prototype.hasOwnProperty.call(res, KEY_FULL_WIDTH);
         const hasHideGooglePois =
           res && Object.prototype.hasOwnProperty.call(res, KEY_HIDE_GOOGLE_POIS);
         run({
           enabled: hasEnabled ? res[KEY_ENABLED] !== false : true,
+          showRatings: hasShowRatings ? res[KEY_SHOW_RATINGS] !== false : true,
           autoSearch: hasAutoSearch ? res[KEY_AUTO_SEARCH] !== false : false,
           fullWidth: hasFullWidth ? res[KEY_FULL_WIDTH] !== false : false,
           hideGooglePois: hasHideGooglePois ? res[KEY_HIDE_GOOGLE_POIS] === true : false,
@@ -41,7 +51,13 @@
         }
       );
     } catch (_) {
-      run({ enabled: true, autoSearch: false, fullWidth: false, hideGooglePois: false });
+      run({
+        enabled: true,
+        showRatings: true,
+        autoSearch: false,
+        fullWidth: false,
+        hideGooglePois: false,
+      });
     }
   }
 
@@ -86,6 +102,7 @@
     const root = document.documentElement || document.head || document.body;
     setAttrIfPossible(root, "data-p4n-sv-icon", streetViewIconHref);
     setAttrIfPossible(root, "data-p4n-pegman-icon", pegmanIconHref);
+    setAttrIfPossible(root, "data-p4n-show-ratings", settings.showRatings ? "1" : "0");
     setAttrIfPossible(root, "data-p4n-auto-search-map", settings.autoSearch ? "1" : "0");
     setAttrIfPossible(root, "data-p4n-full-width-map", settings.fullWidth ? "1" : "0");
     setAttrIfPossible(
@@ -114,6 +131,7 @@
     s.setAttribute("data-p4nlayer", "1");
     setAttrIfPossible(s, "data-p4n-sv-icon", streetViewIconHref);
     setAttrIfPossible(s, "data-p4n-pegman-icon", pegmanIconHref);
+    setAttrIfPossible(s, "data-p4n-show-ratings", settings.showRatings ? "1" : "0");
     setAttrIfPossible(s, "data-p4n-auto-search-map", settings.autoSearch ? "1" : "0");
     setAttrIfPossible(s, "data-p4n-full-width-map", settings.fullWidth ? "1" : "0");
     setAttrIfPossible(s, "data-p4n-hide-google-pois", settings.hideGooglePois ? "1" : "0");

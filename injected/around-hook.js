@@ -4,6 +4,11 @@
  */
 (function () {
   "use strict";
+  /** Crono interno (ms) para logs `[p4nlayer:time]`; debe usar el mismo reloj que `p4nNowMarkP4n`. */
+  var P4N_PERF_T0 =
+    typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
   var P4N_SV_ICON_URL = "";
   var P4N_PEGMAN_ICON_URL = "";
   var P4N_SV_FALLBACK_URL =
@@ -19,6 +24,7 @@
   var P4N_DEBUG_ON = readDebugFlag();
   if (P4N_DEBUG_ON) {
     try {
+      console.info("[p4nlayer:time] time: 0.00s (inicio del script)");
       console.warn(
         "[p4nlayer] Script de página listo. En consola filtra: p4nlayer (8 letras) — no escribas pn4player (error típico)."
       );
@@ -210,6 +216,72 @@
     }
   }
 
+  function p4nNowMarkP4n() {
+    if (typeof performance !== "undefined" && typeof performance.now === "function") {
+      return performance.now();
+    }
+    return Date.now();
+  }
+
+  function p4nTimeTotalFromStartMsP4n() {
+    return p4nNowMarkP4n() - P4N_PERF_T0;
+  }
+
+  function p4nFmtElapsedP4n(ms) {
+    if (!isFinite(ms) || ms < 0) {
+      return "0.00s";
+    }
+    if (ms < 1) {
+      return ms.toFixed(3) + "ms";
+    }
+    if (ms < 1000) {
+      return ms.toFixed(1) + "ms";
+    }
+    return (ms / 1000).toFixed(2) + "s";
+  }
+
+  function p4nTimeLogTareaValueP4n(nombre, partialMs) {
+    if (!P4N_DEBUG_ON) {
+      return;
+    }
+    try {
+      var tot = p4nTimeTotalFromStartMsP4n();
+      console.info(
+        "[p4nlayer:time] tarea " +
+          nombre +
+          ": parcial time: " +
+          p4nFmtElapsedP4n(partialMs) +
+          ", total time: " +
+          p4nFmtElapsedP4n(tot)
+      );
+    } catch (_tp) {
+      /* ignore */
+    }
+  }
+
+  /**
+   * Cuánto se ha retrasado un timer de `applyPlacesResponse` respecto a lo programado
+   * (setTimeout(0) ≈0ms, 200, 800). Valores altos = hilo principal ocupado antes de ejecutar el callback.
+   */
+  function p4nTimeLogTimerJitterP4n(timerName, expectedDelaySinceScheduleMs) {
+    if (!P4N_DEBUG_ON || !p4nAroundTimersScheduledAtP4n) {
+      return;
+    }
+    var now = p4nNowMarkP4n();
+    var late = now - p4nAroundTimersScheduledAtP4n - expectedDelaySinceScheduleMs;
+    if (late < 0) {
+      late = 0;
+    }
+    p4nTimeLogTareaValueP4n(
+      "jitter: " +
+        timerName +
+        " (retraso extra respecto a programación, incl. " +
+        expectedDelaySinceScheduleMs +
+        "ms)",
+      late
+    );
+  }
+
   function hookReady() {
     try {
       injectP4nStylesOnce();
@@ -260,6 +332,18 @@
   /** @type {Object<string, { rating: unknown, review: unknown }>} */
   var placesById = Object.create(null);
   var allMarkers = [];
+  /** `performance.now()` al programar setTimeout(0/200/800) en `applyPlacesResponse` (para medir retraso del hilo). */
+  var p4nAroundTimersScheduledAtP4n = 0;
+  /** Se incrementa en cada `applyPlacesResponse`; `setTimeout(0/200/800)` captura `thisPass` y sale si un `around` más reciente desplaza. */
+  var p4nAroundResponsePassP4n = 0;
+  /** Pasada cuya pasada `refresh` (tooltips) terminó; `setTimeout(800ms)` no repite el trabajo si ya coincide. */
+  var p4nTooltipsFullRefreshDonePassP4n = 0;
+  /**
+   * Nuevo `refreshAllP4nBadges` (con estrellas) cancela tandas anteriores.
+   * Tamaño de trozo: equilibrio entre long task y nº de frames.
+   */
+  var p4nRefreshBatchSeqP4n = 0;
+  var BADGE_RAF_CHUNK_P4N = 12;
 
   var BADGE_STYLE_ID = "p4nlayer-injected-badge-css";
 
@@ -493,12 +577,22 @@
   }
 
   function setPlacesData(places) {
+    var t0 = 0;
+    if (isDebug()) {
+      t0 = p4nNowMarkP4n();
+    }
     placesById = Object.create(null);
     for (var i = 0; i < places.length; i++) {
       var p = places[i];
       if (p && p.id != null) {
         placesById[String(p.id)] = buildPlaceDataP4n(p, true);
       }
+    }
+    if (isDebug()) {
+      p4nTimeLogTareaValueP4n(
+        "setPlacesData (índice placesById, " + places.length + " entradas en respuesta /around)",
+        p4nNowMarkP4n() - t0
+      );
     }
   }
 
@@ -1665,8 +1759,20 @@
   }
 
   function applyFiltersAllMarkersP4n() {
+    var tF0 = 0;
+    if (isDebug()) {
+      tF0 = p4nNowMarkP4n();
+    }
     for (var i = 0; i < allMarkers.length; i++) {
       applyFiltersToMarkerP4n(allMarkers[i]);
+    }
+    if (isDebug()) {
+      p4nTimeLogTareaValueP4n(
+        "aplicar filtros comentarios/fecha (todos los marcadores, " +
+          allMarkers.length +
+          ")",
+        p4nNowMarkP4n() - tF0
+      );
     }
     if (!isDebug()) {
       return;
@@ -2641,21 +2747,50 @@
   }
 
   /**
+   * Solo atributo id, icono de tipo y filtros: sin capas de estrellas/valoración ni
+   * bindTooltip. Se llama desde onAdd / reintentos; el trabajo caro (tooltips) queda
+   * centralizado en refreshAllP4nBadges (tras /around) para no multiplicar 200×
+   * binarios de Leaflet al registrar marcadores.
+   */
+  function applyP4nIdIconAndFilterOnlyP4n(m) {
+    if (!m || !m.place || m.place.id == null) {
+      return;
+    }
+    injectP4nStylesOnce();
+    var idF = String(m.place.id);
+    var dataF = placesById[idF] || buildPlaceDataP4n(m.place, false);
+    ensureTypeIconOnMarkerP4n(m, dataF);
+    applyFiltersToMarkerP4n(m);
+  }
+
+  /**
    * Usamos el mecanismo nativo de Leaflet (tooltip permanente). Se reposiciona
    * solo con pan/zoom y funciona aunque el mapa viva dentro de Shadow DOM,
    * porque Leaflet lo pinta en su propio pane del mapa.
    */
-  function ensureP4nBadgeOnMarker(m) {
+  function ensureP4nBadgeOnMarker(m, perf) {
     if (!m || !m.place || m.place.id == null) {
       return;
     }
     injectP4nStylesOnce();
     var id = String(m.place.id);
     var data = placesById[id] || buildPlaceDataP4n(m.place, false);
+    if (perf) {
+      var tIcon = p4nNowMarkP4n();
+    }
     ensureTypeIconOnMarkerP4n(m, data);
+    if (perf) {
+      perf.sumIcon += p4nNowMarkP4n() - tIcon;
+    }
+    if (perf) {
+      var tRest = p4nNowMarkP4n();
+    }
     var html = contentForP4n(data);
     if (!html) {
       applyFiltersToMarkerP4n(m);
+      if (perf) {
+        perf.sumTip += p4nNowMarkP4n() - tRest;
+      }
       return;
     }
     var urlInfo = urlInfoP4n(data);
@@ -2677,6 +2812,9 @@
         }
         bindTooltipHoverP4n(m, data);
         applyFiltersToMarkerP4n(m);
+        if (perf) {
+          perf.sumTip += p4nNowMarkP4n() - tRest;
+        }
         return;
       }
       if (current && typeof m.unbindTooltip === "function") {
@@ -2710,6 +2848,9 @@
       /* ignore */
     }
     applyFiltersToMarkerP4n(m);
+    if (perf) {
+      perf.sumTip += p4nNowMarkP4n() - tRest;
+    }
   }
 
   function registerMarkerP4n(m) {
@@ -2720,27 +2861,167 @@
     allMarkers.push(m);
   }
 
-  function refreshAllP4nBadges() {
-    if (!allMarkers.length) {
+  /** Línea de inicio de bloque (cola setTimeout) para no confundir con el desglose interno. */
+  function p4nTimeLogColaInicioP4n(colaId) {
+    if (!P4N_DEBUG_ON || !colaId) {
       return;
     }
-    var c = 0;
-    for (var i = 0; i < allMarkers.length; i++) {
-      var m = allMarkers[i];
-      if (!m) {
-        continue;
-      }
-      try {
-        tryApplyP4nIdToMarker(m);
-        ensureP4nBadgeOnMarker(m);
-        c += 1;
-      } catch (_rb) {
-        /* ignore */
-      }
+    try {
+      var tot = p4nTimeTotalFromStartMsP4n();
+      var n = allMarkers.length;
+      console.info(
+        "[p4nlayer:time] cola " +
+          colaId +
+          " inicio: allMarkers=" +
+          n +
+          " showEstrellas=" +
+          (SHOW_RATINGS_ENABLED_P4n ? "1" : "0") +
+          " total: " +
+          p4nFmtElapsedP4n(tot)
+      );
+    } catch (_ci) {
+      /* ignore */
+    }
+  }
+
+  function p4nRunOneRefreshMarkerP4n(m, perf) {
+    if (perf) {
+      var tId = p4nNowMarkP4n();
+    }
+    tryApplyP4nIdToMarker(m);
+    if (perf) {
+      perf.sumTryP4nId += p4nNowMarkP4n() - tId;
+    }
+    ensureP4nBadgeOnMarker(m, perf);
+  }
+
+  function p4nFinishRefreshBadgesLogsP4n(pref, isPerf, perf, tLoop0, c) {
+    if (isPerf && perf && c) {
+      var tLoop = p4nNowMarkP4n() - tLoop0;
+      p4nTimeLogTareaValueP4n(
+        pref + "refrescar badges: asignar data-p4n-id (" + c + " marcadores)",
+        perf.sumTryP4nId
+      );
+      p4nTimeLogTareaValueP4n(
+        pref + "refrescar badges: sustituir iconos de tipo (" + c + " marcadores)",
+        perf.sumIcon
+      );
+      p4nTimeLogTareaValueP4n(
+        pref +
+          "refrescar badges: " +
+          (SHOW_RATINGS_ENABLED_P4n
+            ? "post-icono, tooltips + binds + filtros (estrellas/valoración)"
+            : "post-icono, solo applyFilters (sin capas de estrellas)") +
+          " (" +
+          c +
+          " marcadores)",
+        perf.sumTip
+      );
+      p4nTimeLogTareaValueP4n(
+        pref +
+          "refrescar badges: bucle completo (" +
+          c +
+          " marcadores" +
+          (SHOW_RATINGS_ENABLED_P4n ? ", trozos rAF " + BADGE_RAF_CHUNK_P4N : "") +
+          ")",
+        tLoop
+      );
     }
     if (isDebug() && c) {
       dlog("badges (contexto página), marcadores tocados:", c);
     }
+  }
+
+  function p4nScheduleRafP4n(fn) {
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(fn);
+    } else {
+      setTimeout(fn, 0);
+    }
+  }
+
+  function refreshAllP4nBadges(colaId, onDone, aroundPassP4n) {
+    colaId = colaId ? String(colaId) : "";
+    var pref = colaId ? "[" + colaId + "] " : "";
+    onDone = typeof onDone === "function" ? onDone : function () {};
+    if (colaId) {
+      p4nTimeLogColaInicioP4n(colaId);
+    }
+    if (!allMarkers.length) {
+      if (isDebug() && colaId) {
+        p4nTimeLogTareaValueP4n(
+          pref + "refrescar badges: sin marcadores (salto, allMarkers vacío)",
+          0
+        );
+      }
+      onDone();
+      return;
+    }
+    var isPerf = isDebug();
+    var perf = isPerf
+      ? { sumTryP4nId: 0, sumIcon: 0, sumTip: 0, n: 0 }
+      : null;
+    var tLoop0 = isPerf ? p4nNowMarkP4n() : 0;
+    var nEnd = allMarkers.length;
+    if (!SHOW_RATINGS_ENABLED_P4n) {
+      var cSync = 0;
+      for (var i0 = 0; i0 < nEnd; i0++) {
+        var m0 = allMarkers[i0];
+        if (!m0) {
+          continue;
+        }
+        try {
+          p4nRunOneRefreshMarkerP4n(m0, perf);
+          cSync += 1;
+          if (perf) {
+            perf.n += 1;
+          }
+        } catch (_rb) {
+          /* ignore */
+        }
+      }
+      p4nFinishRefreshBadgesLogsP4n(pref, isPerf, perf, tLoop0, cSync);
+      if (typeof aroundPassP4n === "number" && cSync) {
+        p4nTooltipsFullRefreshDonePassP4n = aroundPassP4n;
+      }
+      onDone();
+      return;
+    }
+    p4nRefreshBatchSeqP4n += 1;
+    var mySeq = p4nRefreshBatchSeqP4n;
+    var c = 0;
+    var idx = 0;
+    function doChunk() {
+      if (mySeq !== p4nRefreshBatchSeqP4n) {
+        return;
+      }
+      var hi = Math.min(idx + BADGE_RAF_CHUNK_P4N, nEnd);
+      for (; idx < hi; idx++) {
+        var m = allMarkers[idx];
+        if (!m) {
+          continue;
+        }
+        try {
+          p4nRunOneRefreshMarkerP4n(m, perf);
+          c += 1;
+          if (perf) {
+            perf.n += 1;
+          }
+        } catch (_rb) {
+          /* ignore */
+        }
+      }
+      if (idx < nEnd) {
+        p4nScheduleRafP4n(doChunk);
+        return;
+      }
+      p4nFinishRefreshBadgesLogsP4n(pref, isPerf, perf, tLoop0, c);
+      if (typeof aroundPassP4n === "number" && c) {
+        p4nTooltipsFullRefreshDonePassP4n = aroundPassP4n;
+      }
+      onDone();
+    }
+    p4nScheduleRafP4n(doChunk);
   }
 
   function tryParseBody(text) {
@@ -2794,10 +3075,24 @@
   }
 
   function applyPlacesResponse(text) {
+    var tParse0 = 0;
+    if (isDebug()) {
+      tParse0 = p4nNowMarkP4n();
+    }
     const places = tryParseBody(text);
+    if (isDebug()) {
+      p4nTimeLogTareaValueP4n(
+        "tryParseBody cuerpo /api/places/around (JSON o base64)",
+        p4nNowMarkP4n() - tParse0
+      );
+    }
     if (Array.isArray(places) && places.length) {
       setPlacesData(places);
       dlog("around OK, lugares:", places.length, "id:", places[0] && places[0].id);
+      var tPost0 = 0;
+      if (isDebug()) {
+        tPost0 = p4nNowMarkP4n();
+      }
       if (isDebug()) {
         var codes = Object.create(null);
         var missing = 0;
@@ -2813,18 +3108,109 @@
         dlog("codes type.code ->", JSON.stringify(codes), "sin code:", missing);
       }
       emit(places);
+      if (isDebug()) {
+        p4nTimeLogTareaValueP4n(
+          "trabajo post-setPlaces (stats códigos tipo + emit) — " + places.length + " lugares",
+          p4nNowMarkP4n() - tPost0
+        );
+      }
+      if (isDebug()) {
+        p4nAroundTimersScheduledAtP4n = p4nNowMarkP4n();
+      }
+      var thisAroundPassP4n = ++p4nAroundResponsePassP4n;
       setTimeout(function () {
-        refreshAllP4nBadges();
-        scheduleSidebarSvLinksP4n();
+        if (thisAroundPassP4n < p4nAroundResponsePassP4n) {
+          return;
+        }
+        if (isDebug()) {
+          p4nTimeLogTimerJitterP4n("setTimeout(0ms)", 0);
+        }
+        var tw0 = 0;
+        if (isDebug()) {
+          tw0 = p4nNowMarkP4n();
+        }
+        refreshAllP4nBadges(
+          "setTimeout(0ms)",
+          function () {
+            scheduleSidebarSvLinksP4n();
+            if (isDebug()) {
+              p4nTimeLogTareaValueP4n(
+                "cierre setTimeout(0ms) (callback completo: refresh + scheduleSidebar)",
+                p4nNowMarkP4n() - tw0
+              );
+            }
+          },
+          thisAroundPassP4n
+        );
       }, 0);
       setTimeout(function () {
-        refreshAllP4nBadges();
-        scheduleSidebarSvLinksP4n();
+        if (thisAroundPassP4n < p4nAroundResponsePassP4n) {
+          return;
+        }
+        if (isDebug()) {
+          p4nTimeLogTimerJitterP4n("setTimeout(200ms)", 200);
+        }
+        var tw200 = 0;
+        if (isDebug()) {
+          tw200 = p4nNowMarkP4n();
+        }
+        refreshAllP4nBadges(
+          "setTimeout(200ms)",
+          function () {
+            scheduleSidebarSvLinksP4n();
+            if (isDebug()) {
+              p4nTimeLogTareaValueP4n(
+                "cierre setTimeout(200ms) (callback completo: refresh + scheduleSidebar)",
+                p4nNowMarkP4n() - tw200
+              );
+            }
+          },
+          thisAroundPassP4n
+        );
       }, 200);
       setTimeout(function () {
-        refreshAllP4nBadges();
-        applyFiltersAllMarkersP4n();
-        scheduleSidebarSvLinksP4n();
+        if (thisAroundPassP4n < p4nAroundResponsePassP4n) {
+          return;
+        }
+        if (isDebug()) {
+          p4nTimeLogTimerJitterP4n("setTimeout(800ms)", 800);
+        }
+        var tw800 = 0;
+        if (isDebug()) {
+          tw800 = p4nNowMarkP4n();
+        }
+        if (p4nTooltipsFullRefreshDonePassP4n === thisAroundPassP4n) {
+          if (isDebug()) {
+            p4nTimeLogColaInicioP4n("setTimeout(800ms)");
+            p4nTimeLogTareaValueP4n(
+              "[setTimeout(800ms)] refrescar badges: omitido (ya hecho en 0/200ms), solo filtros + sidebar",
+              0
+            );
+          }
+          applyFiltersAllMarkersP4n();
+          scheduleSidebarSvLinksP4n();
+          if (isDebug()) {
+            p4nTimeLogTareaValueP4n(
+              "cierre setTimeout(800ms) (callback completo: refresh + filtros + scheduleSidebar)",
+              p4nNowMarkP4n() - tw800
+            );
+          }
+        } else {
+          refreshAllP4nBadges(
+            "setTimeout(800ms)",
+            function () {
+              applyFiltersAllMarkersP4n();
+              scheduleSidebarSvLinksP4n();
+              if (isDebug()) {
+                p4nTimeLogTareaValueP4n(
+                  "cierre setTimeout(800ms) (callback completo: refresh + filtros + scheduleSidebar)",
+                  p4nNowMarkP4n() - tw800
+                );
+              }
+            },
+            thisAroundPassP4n
+          );
+        }
       }, 800);
     } else {
       dlog("around parse vacío, muestra de body:", (text && String(text).slice(0, 80)) || null);
@@ -2977,13 +3363,17 @@
       if (!el) {
         return false;
       }
+      var wantId = String(pl.id);
+      if (el.getAttribute && el.getAttribute(ATTR) === wantId) {
+        return true;
+      }
       if (el.setAttribute) {
-        el.setAttribute(ATTR, String(pl.id));
+        el.setAttribute(ATTR, wantId);
       } else {
         return false;
       }
       try {
-        ensureP4nBadgeOnMarker(m);
+        applyP4nIdIconAndFilterOnlyP4n(m);
       } catch (_z) {
         /* ignore */
       }
@@ -3006,7 +3396,7 @@
             return;
           }
           try {
-            ensureP4nBadgeOnMarker(marker);
+            applyP4nIdIconAndFilterOnlyP4n(marker);
           } catch (_zr) {
             /* ignore */
           }
